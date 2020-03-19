@@ -89,6 +89,7 @@ class Genome{
         for(let n of this.nodes.values()){
             n.reset();
         }
+
         return outputs;
     }
 
@@ -107,6 +108,7 @@ class Genome{
             let y = this.drawDimensions/(l.length+1);
             for(let n of l){
                 n.vector = createVector(x,y);
+                n.radius = Math.pow(this.drawDimensions, 1/3)*2
                 y += this.drawDimensions/(l.length+1);
             }
             x += this.drawDimensions/(this.drawLayers.length+1);

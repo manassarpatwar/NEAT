@@ -4,8 +4,8 @@ class Node{
     layer;
     inputSum;
     outputValue;
-    nodeOpacity;
     vector;
+    radius;
 
     constructor(n, type){
         this.number = n;
@@ -16,7 +16,6 @@ class Node{
     }
 
     reset(){
-        this.nodeOpacity = this.outputValue;
         this.inputSum = 0;
         this.outputValue = 0;
     }

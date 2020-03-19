@@ -40,6 +40,7 @@ function draw(){
 
 function drawBest(p){
     p.brain.computeDrawCoordinates();
+    let xOffset = 20;
     push();
     for(let c of p.brain.connections.values()){
         if(c.isEnabled()){
@@ -47,13 +48,19 @@ function drawBest(p){
         }else{
             stroke(255, 0, 0);
         }
-        line(p.brain.nodes.get(c.inNode).vector.x, p.brain.nodes.get(c.inNode).vector.y, p.brain.nodes.get(c.outNode).vector.x, p.brain.nodes.get(c.outNode).vector.y)
+        line(p.brain.nodes.get(c.inNode).vector.x + xOffset, p.brain.nodes.get(c.inNode).vector.y, p.brain.nodes.get(c.outNode).vector.x + xOffset, p.brain.nodes.get(c.outNode).vector.y)
     }
     pop();
     push();
     for(let n of p.brain.nodes.values()){
-        fill(255,255,255, n.nodeOpacity);
-        ellipse(n.vector.x, n.vector.y, Math.pow(p.brain.drawDimensions, 1/3)*2, Math.pow(p.brain.drawDimensions, 1/3)*2);
+        if(n.type == "INPUT"){
+            text("INPUT", xOffset-10, n.vector.y+ n.radius/2);
+        }
+        else if(n.type == "BIAS"){
+            text("BIAS", xOffset-10, n.vector.y+ n.radius/2);
+        }
+        fill(255,255,255);
+        ellipse(n.vector.x + xOffset, n.vector.y, n.radius,  n.radius);
     }
     pop();
 }
