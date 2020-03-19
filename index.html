@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js"> <!--<![endif]-->
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title></title>
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="stylesheet" href="./main.css">
+        <script language="javascript" type="text/javascript" src="./lib/p5.js"></script>
+        <script language="javascript" type="text/javascript" src="./connection.js"></script>
+        <script language="javascript" type="text/javascript" src="./genome.js"></script>
+        <script language="javascript" type="text/javascript" src="./node.js"></script>
+        <script language="javascript" type="text/javascript" src="./connectionHistory.js"></script>
+        <script language="javascript" type="text/javascript" src="./innovationCounter.js"></script>
+        <script language="javascript" type="text/javascript" src="./species.js"></script>
+        <script language="javascript" type="text/javascript" src="./population.js"></script>
+        <script language="javascript" type="text/javascript" src="./player.js"></script>
+        <script language="javascript" type="text/javascript" src="./sketch.js"></script>
+    </head>
+    <body>
+        <!--[if lt IE 7]>
+            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
+        <![endif]-->
+        
+    </body>
+    <script>
+        let p1 = new Genome();
+        p1.numInputs = 3;
+        p1.numOutputs = 1;
+        let p2 = new Genome();
+        p2.numInputs = 3;
+        p2.numOutputs = 1;
+
+        let p3 = new Genome(3,1);
+        
+        p1.addNode(new Node(1, "INPUT"))
+        p1.addNode(new Node(2, "INPUT"))
+        p1.addNode(new Node(3, "INPUT"))
+        p1.addNode(new Node(4, "OUTPUT"))
+        p1.addNode(new Node(5, "HIDDEN"))
+        
+        p1.addConnection(new Connection(1, 4, 1, Math.random(), true))
+        p1.addConnection(new Connection(2, 4, 2, Math.random(), false))
+        p1.addConnection(new Connection(3, 4, 3, Math.random(), true))
+        p1.addConnection(new Connection(2, 5, 4, Math.random(), true))
+        p1.addConnection(new Connection(5, 4, 5, Math.random(), true))
+        p1.addConnection(new Connection(1, 5, 8, Math.random(), true))
+
+        p2.addNode(new Node(1, "INPUT"))
+        p2.addNode(new Node(2, "INPUT"))
+        p2.addNode(new Node(3, "INPUT"))
+        p2.addNode(new Node(4, "OUTPUT"))
+        p2.addNode(new Node(5, "HIDDEN"))
+        p2.addNode(new Node(6, "HIDDEN"))
+        
+        p2.addConnection(new Connection(1, 4, 1, Math.random(), true))
+        p2.addConnection(new Connection(2, 4, 2, Math.random(), false))
+        p2.addConnection(new Connection(3, 4, 3, Math.random(), true))
+        p2.addConnection(new Connection(2, 5, 4, Math.random(), true))
+        p2.addConnection(new Connection(5, 4, 5, Math.random(), false))
+        p2.addConnection(new Connection(5, 6, 6, Math.random(), true))
+        p2.addConnection(new Connection(6, 4, 7, Math.random(), true))
+        p2.addConnection(new Connection(3, 5, 9, Math.random(), true))
+        p2.addConnection(new Connection(1, 6, 10, Math.random(), true))
+
+
+        p3.addNode(new Node(1, "INPUT"))
+        p3.addNode(new Node(2, "INPUT"))
+        p3.addNode(new Node(3, "INPUT"))
+        p3.addNode(new Node(4, "OUTPUT"))
+        p3.addNode(new Node(5, "HIDDEN"))
+        
+        p3.addConnection(new Connection(1, 4, 1, Math.random(), true))
+        p3.addConnection(new Connection(2, 4, 2, Math.random(), false))
+        p3.addConnection(new Connection(3, 4, 3, Math.random(), true))
+        p3.addConnection(new Connection(2, 5, 7, Math.random(), true))
+        p3.addConnection(new Connection(5, 4, 9, Math.random(), true))
+        p3.addConnection(new Connection(1, 5, 10, Math.random(), true))
+    </script>
+</html>
