@@ -16,12 +16,12 @@ function draw(){
     background(0);
     fill(255);
 
-    if(population.gen < 10000 && population.bestScore < 4){
+    if(population.gen < 10000){
         for(let p of population.population){
             for(let i = 0; i < inputs.length; i++){
                 p.look(inputs[i]);
-                if(p.think() == outputs[i])
-                    p.score++;
+                // if(p.think() == outputs[i])
+                p.score += 1- Math.abs(p.think()-outputs[i]);
 
                 // console.log(p.think() + " "+ outputs[i]+" "+p.score);
             }
@@ -29,11 +29,10 @@ function draw(){
         }
         if(population.done()){
             population.naturalSelection();
-            drawBest(population.best);
         }
     }
 
-    if(population.bestScore == 4){
+    if(population.best){
         drawBest(population.best);
     }
 }

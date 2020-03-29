@@ -11,7 +11,7 @@ class Population{
         this.best = null;
         for(let i = 0; i < this.populationSize; i++){
             this.population[i] = new Player(inputs, outputs);
-            this.population[this.population.length - 1].brain.mutateConnection(this.innovationHistory);
+            this.population[this.population.length - 1].brain.mutate(this.innovationHistory);
         }
 
     }
@@ -49,8 +49,9 @@ class Population{
             }
         }
         // console.log(bs);
-        this.speciate();
         this.calculateFitness();
+        this.speciate();
+
 
         this.sortSpecies();
     
@@ -59,23 +60,6 @@ class Population{
         this.setBestPlayer();
         this.killStaleSpecies();
 
-        let tempSpecies = [];
-        let willBeKilled = [];
-        let childs = [];
-        let o = 0;
-        for(let s of this.species){
-            tempSpecies[o] = new Species(s.getMascot())
-            arrayCopy(s.members, tempSpecies[o].members);
-            tempSpecies[o].averageFitness = s.averageFitness;
-            tempSpecies[o].bestFitness = s.bestFitness;
-            tempSpecies[o].staleness = s.staleness;
-            let noc = this.noOfChildren(s);
-            willBeKilled.push(noc < 1);
-            childs.push(noc)
-            o++;
-        }
-        // console.log({species: tempSpecies, killed : willBeKilled, children: childs});
-        // console.log(tempSpecies)
         this.killBadSpecies();
         console.log("Gen: "+ this.gen + "  Number of Species: " + this.species.length  +" Node mutations: "+nodeMut+" Best Score: "+this.population.reduce((max, p) => max.score > p.score ? max : p).score);
         // console.log(this.species[0].members[0].score);
@@ -84,8 +68,8 @@ class Population{
 
         for(let s of this.species){
 
-            children.push(s.members[0].clone());
-            let noOfChildren = Math.floor(s.averageFitness/averageSum*this.populationSize)-1;
+            children.push(s.mascot.clone());
+            let noOfChildren = Math.floor(s.averageFitness/averageSum*this.population.length)-1;
 
             for(let i = 0; i < noOfChildren; i++){
                 children.push(s.crossover(this.innovationHistory));
@@ -96,20 +80,8 @@ class Population{
             children.push(this.species[0].crossover(this.innovationHistory));
         }
         this.population = [];
-        // this.species = [];
-        arrayCopy(children, this.population);
 
-        // let x = 0;
-        // let y = 0; 
-        // for(let p of this.population){
-        //     p.brain.setCanvasPos(createVector(x,y));
-        //     p.brain.computeDrawCoordinates();
-        //     x += 100;
-        //     if(x > windowWidth-100){
-        //         x = 0;
-        //         y += 100;
-        //     }
-        // }
+        arrayCopy(children, this.population);
 
         this.gen++;
     }
@@ -141,7 +113,7 @@ class Population{
 
     killStaleSpecies() {
         for (var i = 2; i < this.species.length; i++) {
-            if (this.species[i].staleness >= 15) {
+            if (this.species[i].staleness >= 20) {
                 this.species.splice(i, 1);
                 i--;
             }
@@ -166,13 +138,15 @@ class Population{
         for(let s of this.species){
             s.sortSpecies();
         }
-        this.species = this.species.sort((a,b) => a.bestFitness < b.bestFitness ? 1 : -1);
+         //sort the this.species by the fitness of its best player
+
+        this.species.sort((a,b) => a.bestFitness > b.bestFitness ? -1 : 1);
+
     }
 
     speciate(){
         for(let s of this.species){
             s.members = [];
-            s.reset();
         }
         for(let i = 0; i < this.populationSize; i++){
             let p = this.population[i];

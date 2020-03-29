@@ -1,10 +1,10 @@
 class Player{
     constructor(inputs, outputs){
-        this.fitness;
         this.dead = false;
         this.inputs = [];
         this.outputs = [];
         this.score = 0;
+        this.fitness = 0;
         if(inputs instanceof Genome){
             this.brain = inputs.clone();
         }else{
@@ -18,7 +18,7 @@ class Player{
 
     think(){
         this.outputs = this.brain.feedForward(this.inputs);
-        this.outputs = this.outputs[0] > 0.5 ? 1 : 0;
+        // this.outputs = this.outputs[0] > 0.5 ? 1 : 0;
         return this.outputs;
     }
 
@@ -32,6 +32,21 @@ class Player{
     }
 
     clone(){
-        return new Player(this.brain);
+        let clone = new Player(this.brain);
+        clone.fitness = this.fitness;
+        return clone;
     }
+
+    cloneForReplay() {
+        var clone = new Player(this.brain.clone());
+        clone.fitness = this.fitness;
+        clone.bestScore = this.score;
+    
+        return clone;
+      }
+
+    crossover(parent2) {
+        var child = new Player(this.brain.crossover(parent2.brain));
+        return child;
+      }
 }
