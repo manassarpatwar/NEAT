@@ -20,8 +20,6 @@ export default class Genome {
         this.biasNode.layer = 0;
         this.addNode(this.biasNode);
 
-        this.drawDimensions = 500;
-
         if (numInputs != null && numOutputs != null) {
             const inputs = [];
             const outputs = [];
@@ -124,25 +122,25 @@ export default class Genome {
         return outputs;
     }
 
-    computeDrawCoordinates() {
-        this.drawLayers = [];
+    computeNodeCoordinates(size) {
+        const layers = [];
         for (const n of this.nodes.values()) {
-            this.drawLayers[n.layer] = [];
+            layers[n.layer] = [];
         }
         for (const n of this.nodes.values()) {
-            this.drawLayers[n.layer].push(n);
+            layers[n.layer].push(n);
         }
+        const maxNodesPerLayer = Math.max(...layers.map(l => l.length));
+        let x = size / (layers.length + 1);
 
-        let x = this.drawDimensions / (this.drawLayers.length + 1);
-
-        for (const l of this.drawLayers) {
-            let y = this.drawDimensions / (l.length + 1);
+        for (const l of layers) {
+            let y = size / (l.length + 1);
             for (const n of l) {
                 n.vector = { x, y };
-                n.radius = Math.pow(this.drawDimensions, 1 / 3) * 2;
-                y += this.drawDimensions / (l.length + 1);
+                n.radius = size / (maxNodesPerLayer*10);
+                y += size / (l.length + 1);
             }
-            x += this.drawDimensions / (this.drawLayers.length + 1);
+            x += size / (layers.length + 1);
         }
     }
 
@@ -318,12 +316,12 @@ export default class Genome {
             this.mutateWeights();
         }
         const rand2 = Math.random();
-        if (rand2 < 0.1) {
+        if (rand2 < 0.05) {
             this.mutateConnection(innovationHistory);
         }
 
         const rand3 = Math.random();
-        if (rand3 < 0.001) {
+        if (rand3 < 0.03) {
             this.mutateNode(innovationHistory);
         }
     }
