@@ -1,4 +1,4 @@
-class Node{
+export default class Node{
     number;
     type;
     layer;
@@ -33,7 +33,7 @@ class Node{
     }
 
     copy(){
-        let n = new Node(this.number, this.type);
+        const n = new Node(this.number, this.type);
         n.layer = this.layer;
         return n;
     }
