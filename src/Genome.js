@@ -122,7 +122,7 @@ export default class Genome {
         return outputs;
     }
 
-    computeNodeCoordinates(size) {
+    computeNodeCoordinates(width, height) {
         const layers = [];
         for (const n of this.nodes.values()) {
             layers[n.layer] = [];
@@ -131,17 +131,18 @@ export default class Genome {
             layers[n.layer].push(n);
         }
         const maxNodesPerLayer = Math.max(...layers.map(l => l.length));
-        let x = size / (layers.length + 1);
+        let x = width / (layers.length + 1);
 
         for (const l of layers) {
-            let y = size / (l.length + 1);
+            let y = height / (l.length + 1);
             for (const n of l) {
                 n.vector = { x, y };
-                n.radius = size / (maxNodesPerLayer*10);
-                y += size / (l.length + 1);
+                n.radius = height / (maxNodesPerLayer*10);
+                y += height / (l.length + 1);
             }
-            x += size / (layers.length + 1);
+            x += width / (layers.length + 1);
         }
+        return layers;
     }
 
     addNode(node) {

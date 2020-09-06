@@ -14,7 +14,8 @@ window.onload = setup();
 function setup() {
     const canvas = document.getElementById("canvas");
     const size = 200;
-    canvas.width = size;
+    const offset = 100;
+    canvas.width = size + offset;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
 
@@ -35,10 +36,18 @@ function setup() {
             }
             neat.naturalSelection();
             if (neat.best) {
-                GraphNN(ctx, size, neat.best);
+                GraphNN(
+                    ctx,
+                    {
+                        size,
+                        offset,
+                        font: "14px Helvetica",
+                        labels: ["BIAS", "IN", "IN"],
+                    },
+                    neat.best
+                );
             }
         }
     }
     draw();
 }
-
