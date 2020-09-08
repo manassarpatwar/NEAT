@@ -1,126 +1,138 @@
-import Genome from "./Genome.js";
+import Config from "./Config";
+import { selectRandom, shuffle } from "./utils";
+import Genome from "./Genome";
 
 export default class Species {
-    constructor(mascot) {
-        this.members = [];
-        this.members.push(mascot);
-        this.mascot = mascot.clone();
-
-        this.bestFitness = mascot.fitness;
+    constructor(specimen) {
+        this.members = [specimen];
+        this.specimen = specimen;
+        this.age = 0;
         this.averageFitness = 0;
-        this.staleness = 0;
-
-        this.c1 = 1;
-        this.c2 = 0.4;
-        this.D = 3;
+        this.bestFitness = 0;
+        this.totalFitness = 0;
+        this.ageOfLastImprovement = 0;
+        this.expectedOffsprings = 0;
     }
 
     addMember(member) {
         this.members.push(member);
     }
 
-    getMascot() {
-        return this.mascot;
+    contains(genome) {
+        const { distance } = Genome.compatibility(genome, this.specimen);
+        return distance < Config.compatibilityThreshold;
     }
 
-    sameSpecies(g) {
-        const excessAndDisjoint = Genome.getExcessDisjoint(g, this.mascot); //get the number of excess and disjoint genes between this player and the current species this.rep
-        const averageWeightDiff = Genome.averageWeightDiff(g, this.mascot); //get the average weight difference between matching genes
+    getChampion() {
+        return this.members[0];
+    }
 
-        let largeGenomeNormaliser = g.connections.size - 20;
-        if (largeGenomeNormaliser < 1) {
-            largeGenomeNormaliser = 1;
+    getRandomMember() {
+        const rand = Math.random() * this.totalFitness;
+        let runningSum = 0;
+
+        const shuffled = shuffle([...this.members]);
+        shuffled.forEach(member => {
+            runningSum += member.fitness;
+            if (runningSum > rand) {
+                return member;
+            }
+        });
+        return shuffled[0];
+    }
+
+    adjustFitness() {
+        this.totalFitness = 0;
+        this.extinct = this.age - this.ageOfLastImprovement + 1 > Config.dropoffAge;
+
+        this.members.forEach(member => {
+            if (this.extinct) {
+                // Penalty for a long period of stagnation (divide fitness by 100)
+                member.adjustedFitness *= 0.01;
+            }
+
+            if (this.age <= 10) {
+                // boost young members
+                member.adjustedFitness *= Config.ageSignificance;
+            }
+
+            member.adjustedFitness = Math.max(member.fitness, 0.0001) / this.members.length;
+            this.totalFitness += member.fitness;
+        });
+        this.averageFitness = this.totalFitness / this.members.length;
+    }
+
+    sort() {
+        this.members.sort((a, b) => b.fitness - a.fitness);
+        this.specimen = selectRandom(this.members);
+        // update age of last improvement
+        if (this.members[0].fitness > this.bestFitness) {
+            this.bestFitness = this.members[0].fitness;
+            this.ageOfLastImprovement = this.age;
         }
-
-        const compatibility =
-            (this.c1 * excessAndDisjoint) / largeGenomeNormaliser +
-            this.c2 * averageWeightDiff; //compatibility formula
-        return this.D > compatibility;
     }
 
     cull() {
         if (this.members.length > 2) {
-            for (
-                let i = this.members.length / 2;
-                i < this.members.length;
-                i++
-            ) {
-                // this.members.remove(i);
+            const cull = Math.floor(this.members.length * Config.survivalThreshold);
+
+            for (let i = cull; i < this.members.length; i++) {
+                this.members[i].kill = true;
                 this.members.splice(i, 1);
                 i--;
             }
         }
     }
 
-    calculateAverage() {
-        let sum = 0;
-        for (const member of this.members) {
-            sum += member.fitness;
-        }
-        this.averageFitness = sum / this.members.length;
-    }
+    reproduce(InnovationHistory, superChamp, randomSpecies) {
+        const babies = [];
+        const champ = this.getChampion();
+        let champAdded = false;
 
-    fitnessSharing() {
-        for (const member of this.members) {
-            member.fitness /= this.members.length;
-        }
-    }
+        for (let i = 0; i < this.expectedOffspring; i++) {
+            let baby;
 
-    sortSpecies() {
-        if (this.members.length == 0) {
-            this.staleness = 200;
-            return;
-        } else {
-            this.members.sort((a, b) => (a.fitness > b.fitness ? -1 : 1));
-        }
-        //if new best player
-        if (this.members[0].fitness > this.bestFitness) {
-            this.staleness = 0;
-            this.bestFitness = this.members[0].fitness;
-            this.mascot = this.members[0].clone();
-        } else {
-            //if no new best player
-            this.staleness++;
-        }
-    }
+            if (superChamp && superChamp === champ && superChamp.expectedOffspring > 0) {
+                // If we have a population champion, finish off some special clones
+                const genome = superChamp.copy();
 
-    crossover(innovationHistory) {
-        let child;
-        if (Math.random() < 0.25 || this.members.length == 1) {
-            //25% of the time there is no crossover and the child is simply a clone of a random(ish) player
-            child = this.members[this.selectPlayer()].clone();
-        } else {
-            let parent1Index = this.selectPlayer();
-            let parent1 = this.members[parent1Index];
+                if (superChamp.expectedOffspring === 1) {
+                    genome.mutate(InnovationHistory);
+                }
 
-            let parent2 = this.members[this.selectPlayer(parent1Index)];
-            if (parent1.fitness > parent2.fitness) {
-                child = parent1.crossover(parent2);
+                superChamp.expectedOffspring--;
+                baby = genome;
+            } else if (!champAdded && this.expectedOffspring > 5) {
+                // Champion of species with more than 5 networks is copied unchanged
+                baby = champ.copy();
+                champAdded = true;
+            } else if (Math.random() < Config.mutation.mutateOnly) {
+                // Mutate only
+                const mom = this.getRandomMember().copy();
+                mom.mutate(InnovationHistory);
+                baby = mom;
             } else {
-                child = parent2.crossover(parent1);
-            }
-        }
-        child.mutate(innovationHistory);
-        return child;
-    }
+                // mate
+                const mom = this.getRandomMember();
+                let dad;
 
-    selectPlayer(skip) {
-        let fitnessSum = 0;
-        for (let i = 0; i < this.members.length; i++) {
-            if (skip && skip === i) continue;
-            fitnessSum += this.members[i].fitness;
-        }
-        const rand = Math.random() * fitnessSum;
-        let runningSum = 0;
-
-        for (let i = 0; i < this.members.length; i++) {
-            if (skip && skip === i) continue;
-            runningSum += this.members[i].fitness;
-            if (runningSum > rand) {
-                return i;
+                let sp = false;
+                if (Math.random() > Config.interspeciesMateRate) {
+                    dad = this.getRandomMember();
+                } else {
+                    dad = randomSpecies.getChampion();
+                    sp = true;
+                }
+                
+                if(!dad){
+                    console.log(`${sp ? 'interspecies dad!!' : 'THIS SPECIES MEMBER!!!'}`, randomSpecies);
+                }
+                baby = Genome.crossover(dad, mom);
+                baby.mutate(InnovationHistory);
             }
+            babies.push(baby);
         }
-        //unreachable code to make the parser happy
-        return 0;
+
+        return babies;
     }
 }

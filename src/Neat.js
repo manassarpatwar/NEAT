@@ -1,155 +1,155 @@
-import Genome from "./Genome.js";
-import Species from "./Species.js";
+import InnovationHistory from "./InnovationHistory";
+import Species from "./Species";
+import Config from "./Config";
+import Genome from "./Genome";
+import { shuffle } from "./utils";
 
 export default class Neat {
-    constructor(size, inputs, outputs) {
-        this.populationSize = size;
-        this.population = [];
-
-        this.bestScore = 0;
-        this.previousBest;
-        this.innovationHistory = [];
+    constructor(inputs, outputs, populationSize = 0, fitnessFunction = g => Math.random()) {
+        this.InnovationHistory = new InnovationHistory(inputs + outputs + 1);
+        this.populationSize = populationSize;
         this.species = [];
-        this.gen = 0;
-        this.best = null;
+        this.population = [];
+        this.generation = 0;
+        this.fitnessFunction = fitnessFunction;
         for (let i = 0; i < this.populationSize; i++) {
-            this.population[i] = new Genome(inputs, outputs);
-            this.population[this.population.length - 1].mutate(
-                this.innovationHistory
-            );
+            const genome = new Genome();
+            genome.createNetwork(inputs, outputs);
+            genome.mutateAddConnection(this.InnovationHistory);
+            this.population.push(genome);
         }
-    }
-
-    setBestPlayer() {
-        const tempBest = this.species[0].members[0];
-        tempBest.gen = this.gen;
-
-        if (tempBest.score >= this.bestScore) {
-            this.bestScore = tempBest.score;
-            this.best = tempBest.clone();
-        }
-    }
-
-    naturalSelection() {
-        this.calculateFitness();
-        this.speciate();
-
-        this.sortSpecies();
-
-        this.cullSpecies();
-
-        this.setBestPlayer();
-        this.killStaleSpecies();
-
-        this.killBadSpecies();
-        console.log(
-            "Gen: " +
-                this.gen +
-                "  Number of Species: " +
-                this.species.length +
-                " Best Score: " +
-                this.population.reduce((max, p) =>
-                    max.score > p.score ? max : p
-                ).score
-        );
-
-        const averageSum = this.getAvgFitnessSum();
-        const children = [];
-
-        for (const s of this.species) {
-            children.push(s.mascot.clone());
-            const noOfChildren =
-                Math.floor(
-                    (s.averageFitness / averageSum) * this.population.length
-                ) - 1;
-
-            for (let i = 0; i < noOfChildren; i++) {
-                children.push(s.crossover(this.innovationHistory));
-            }
-        }
-
-        while (children.length < this.populationSize) {
-            children.push(this.species[0].crossover(this.innovationHistory));
-        }
-        this.population = [...children];
-
-        this.gen++;
-        return this.population;
-    }
-
-    cullSpecies() {
-        for (const s of this.species) {
-            s.cull();
-            s.fitnessSharing();
-            s.calculateAverage();
-        }
-    }
-
-    killBadSpecies() {
-        const averageSum = this.getAvgFitnessSum();
-
-        for (let i = 1; i < this.species.length; i++) {
-            if (
-                (this.species[i].averageFitness / averageSum) *
-                    this.populationSize <
-                1
-            ) {
-                this.species.splice(i, 1);
-                i--;
-            }
-        }
-    }
-
-    noOfChildren(species) {
-        const averageSum = this.getAvgFitnessSum();
-        return (species.averageFitness / averageSum) * this.population.length;
-    }
-
-    killStaleSpecies() {
-        for (let i = 2; i < this.species.length; i++) {
-            if (this.species[i].staleness >= 20) {
-                this.species.splice(i, 1);
-                i--;
-            }
+        if (this.population.length) {
+            this.speciate();
         }
     }
 
     calculateFitness() {
-        for (const p of this.population) {
-            p.calculateFitness();
-        }
+        this.population.forEach(genome => {
+            genome.fitness = this.fitnessFunction(genome);
+        });
     }
 
-    getAvgFitnessSum() {
-        let averageSum = 0;
-        for (const s of this.species) {
-            averageSum += s.averageFitness;
-        }
-        return averageSum;
+    selectRandomSpecies(totalFitness) {
+        const rand = Math.random() * totalFitness;
+        let runningSum = 0;
+
+        const shuffled = shuffle([...this.species]);
+        shuffled.forEach(species => {
+            runningSum += species.bestFitness;
+            if (runningSum > rand) {
+                return species;
+            }
+        });
+        return shuffled[0];
     }
 
-    sortSpecies() {
-        for (const s of this.species) {
-            s.sortSpecies();
+    getSuperChamp() {
+        return this.population.length
+            ? this.population.reduce((champ, genome) =>
+                  genome.fitness > champ.fitness ? genome : champ
+              )
+            : null;
+    }
+
+    epoch() {
+        this.calculateFitness();
+
+        const superChamp = this.getSuperChamp();
+        console.log(
+            "Gen: " +
+                this.generation +
+                "  Number of Species: " +
+                this.species.length +
+                " Best Score: " +
+                superChamp.score +
+                " Nodes: " +
+                superChamp.nodes.size +
+                " Connections: " +
+                superChamp.connections.size
+        );
+
+        let averageFitness = 0;
+        let totalFitness = 0;
+        // Adjust fitness of species' members
+        this.species.forEach(species => {
+            species.adjustFitness();
+            if (species.members.length === 0) {
+                console.log("WTF");
+            }
+            species.sort();
+            species.cull();
+
+            averageFitness += species.averageFitness;
+            totalFitness += species.bestFitness;
+        });
+
+        for (let i = 0; i < this.population.length; i++) {
+            const genome = this.population[i];
+            // Remove all genomes marked for death
+            if (genome.kill) {
+                this.population.splice(i, 1);
+                i--;
+            } else {
+                genome.expectedOffspring = Math.floor(genome.fitness / averageFitness);
+            }
         }
 
-        this.species.sort((a, b) => (a.bestFitness > b.bestFitness ? -1 : 1));
+        this.species.sort((a, b) => b.bestFitness - a.bestFitness);
+
+        const children = [];
+        // Reproduce all species
+        this.species.forEach((species, i) => {
+            species.expectedOffspring = Math.floor(
+                (species.averageFitness / averageFitness) * this.populationSize
+            );
+            if (!species.expectedOffspring) {
+                this.species.splice(i, 1);
+            } else {
+                children.push(
+                    ...species.reproduce(
+                        this.InnovationHistory,
+                        superChamp,
+                        this.selectRandomSpecies(totalFitness)
+                    )
+                );
+            }
+        });
+
+        this.population = children;
+
+        this.speciate();
+        this.generation++;
     }
 
     speciate() {
-        for (const s of this.species) {
-            s.members = [];
-        }
-        for (const p of this.population) {
-            let createNewSpecies = true;
-            for (const s of this.species) {
-                if (s.sameSpecies(p)) {
-                    createNewSpecies = false;
-                    s.addMember(p);
-                }
+        this.species.forEach(species => {
+            species.members = [];
+            species.age++;
+        });
+
+        this.population.forEach(genome => {
+            const found =
+                this.species.length > 0 &&
+                this.species.some(species => {
+                    const isCompatible = species.contains(genome);
+
+                    if (isCompatible) {
+                        species.addMember(genome);
+                    }
+
+                    return isCompatible;
+                });
+
+            if (!found) {
+                const species = new Species(genome);
+                this.species.push(species);
             }
-            if (createNewSpecies) {
-                this.species.push(new Species(p));
+        });
+
+        for (let i = 0; i < this.species.length; i++) {
+            if (this.species[i].members.length === 0) {
+                this.species.splice(i, 1);
+                i--;
             }
         }
     }

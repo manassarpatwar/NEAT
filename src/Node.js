@@ -1,40 +1,31 @@
-export default class Node{
-    number;
-    type;
-    layer;
-    inputSum;
-    outputValue;
-    vector;
-    radius;
-
-    constructor(n, type){
-        this.number = n;
+export default class Node {
+    constructor(type, id = 0) {
         this.type = type;
-        this.layer = 0;
-        this.inputSum = 0;
-        this.outputValue = 0;
+        this.id = id;
+        this.in = [];
+        this.out = [];
+        this.output = 0;
     }
 
-    reset(){
-        this.inputSum = 0;
-        this.outputValue = 0;
+    //modified sigmoid
+    activation(x, m = 4.9) {
+        return 1 / (1 + Math.exp(-m * x));
     }
 
-    activate(){
-        this.outputValue = this.activationFunction(this.inputSum);
+    activate() {
+        const sum = this.in.reduce((sum, con) => sum + con.from.output * con.weight, 0) || 0;
+        this.output = this.activation(sum);
     }
 
-    activationFunction(x){
-        return 1/(1+Math.exp(-4.9*x))
+    addInConnection(connection) {
+        this.in.push(connection);
     }
 
-    getNodeNumber(){
-        return this.number;
+    addOutConnection(connection) {
+        this.out.push(connection);
     }
 
-    copy(){
-        const n = new Node(this.number, this.type);
-        n.layer = this.layer;
-        return n;
+    copy() {
+        return new Node(this.type, this.id);
     }
 }

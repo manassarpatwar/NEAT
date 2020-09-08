@@ -1,0 +1,53 @@
+{
+    "name": "neatjs",
+    "version": "1.0.0",
+    "description": "Neuro Evolution of Augmenting Topologies",
+    "main": "src/index.js",
+    "directories": {
+        "lib": "lib"
+    },
+    "dependencies": {},
+    "devDependencies": {
+        "@babel/cli": "^7.10.5",
+        "@babel/core": "^7.11.4",
+        "@babel/node": "^7.10.5",
+        "@babel/preset-env": "^7.11.0",
+        "ava": "^3.12.1",
+        "babel-loader": "^8.1.0",
+        "css-loader": "^4.2.2",
+        "esm": "^3.2.25",
+        "html-webpack-plugin": "^4.3.0",
+        "style-loader": "^1.2.1",
+        "url-loader": "^4.1.0",
+        "webpack": "^4.44.1",
+        "webpack-cli": "^3.3.12",
+        "webpack-dev-server": "^3.11.0"
+    },
+    "scripts": {
+        "test": "ava",
+        "watch": "webpack --watch",
+        "build": "webpack"
+    },
+    "ava": {
+        "files": [
+            "test/**/*.js"
+        ],
+        "require": [
+            "esm"
+        ]
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/manassarpatwar/NEAT.git"
+    },
+    "keywords": [
+        "NEAT",
+        "Javascript"
+    ],
+    "author": "manassarpatwar",
+    "license": "MIT",
+    "bugs": {
+        "url": "https://github.com/manassarpatwar/NEAT/issues"
+    },
+    "homepage": "https://github.com/manassarpatwar/NEAT#readme"
+}

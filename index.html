@@ -6,11 +6,110 @@
         <meta name="description" content="">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <link rel="stylesheet" href="./main.css">
-        <script language="javascript" type="module" src="./index.js"></script>
+        <script>
+            window.onload = () => {
+                const { Genome, Node, Connection, InnovationHistory, types }  = Neat;
+                InnovationHistory.nodes = 5;
+                const inputs = 3;
+                const outputs = 1;
+
+                const createNodes = genome => {
+                    for(let i = 0; i < inputs; i++){
+                        const node = new Node(types.INPUT, i+1);
+                        genome.nodes.set(node.id, node);
+                    }
+
+                    for(let i = 0; i < outputs; i++){
+                        const node = new Node(types.OUTPUT, i+inputs+1);
+                        genome.nodes.set(node.id, node);
+                    }
+
+                }
+                
+
+                
+                const genome1 = new Genome();
+                createNodes(genome1);
+                let con = new Connection(genome1.nodes.get(1), genome1.nodes.get(4));
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome1.addConnection(con);
+                con = new Connection(genome1.nodes.get(2), genome1.nodes.get(4), 1, false);
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome1.addConnection(con);
+
+                let n5 = new Node(types.HIDDEN);
+                n5.id = InnovationHistory.getNodeId(con);
+                genome1.nodes.set(n5.id, n5);
+
+                con = new Connection(genome1.nodes.get(3), genome1.nodes.get(4))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome1.addConnection(con);
+
+                con = new Connection(genome1.nodes.get(2), genome1.nodes.get(5))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome1.addConnection(con);
+                con = new Connection(genome1.nodes.get(5), genome1.nodes.get(4))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome1.addConnection(con);
+                
+
+
+                const genome2 = new Genome();
+                createNodes(genome2);
+                con = new Connection(genome2.nodes.get(1), genome2.nodes.get(4))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome2.addConnection(con);
+                con = new Connection(genome2.nodes.get(2), genome2.nodes.get(4), 1, false);
+                con.innovation = InnovationHistory.getInnovation(con);
+                n5 = new Node(types.HIDDEN);
+                n5.id = InnovationHistory.getNodeId(con);
+                genome2.nodes.set(n5.id, n5);
+
+                genome2.addConnection(con);
+                con = new Connection(genome2.nodes.get(3), genome2.nodes.get(4))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome2.addConnection(con);
+
+            
+                con = new Connection(genome2.nodes.get(2), genome2.nodes.get(5))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome2.addConnection(con);
+                con = new Connection(genome2.nodes.get(5), genome2.nodes.get(4), 1, false);
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome2.addConnection(con);
+
+                let n6 = new Node(types.HIDDEN);
+                n6.id = InnovationHistory.getNodeId(con);
+                genome2.nodes.set(n6.id, n6);
+                
+
+                con = new Connection(genome2.nodes.get(5), genome2.nodes.get(6))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome2.addConnection(con);
+                con = new Connection(genome2.nodes.get(6), genome2.nodes.get(4));
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome2.addConnection(con);
+
+                con = new Connection(genome1.nodes.get(1), genome1.nodes.get(5))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome1.addConnection(con);
+
+                con = new Connection(genome2.nodes.get(3), genome2.nodes.get(5))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome2.addConnection(con);
+
+                con = new Connection(genome2.nodes.get(1), genome2.nodes.get(6))
+                con.innovation = InnovationHistory.getInnovation(con);
+                genome2.addConnection(con);
+
+                console.log(genome1, genome2, Genome.crossover(genome1, genome2));
+            }
+        </script>
     </head>
     <body>
         <main>
             <canvas id="canvas"></canvas>
         </main>
+        
     </body>
 </html>
