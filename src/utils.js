@@ -6,12 +6,23 @@ export const random = (min, max) => {
     return Math.random() * (max - min) + min;
 };
 
-export const randomGaussian = () => {
-    let u = 0;
-    let v = 0;
-    while (u === 0) u = Math.random(); //Converting [0,1) to (0,1)
-    while (v === 0) v = Math.random();
-    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+export function gaussian(mean = 0, standardDeviation = 1) {
+    let u, v, s;
+
+    do {
+        v = random(-1, 1);
+        u = random(-1, 1);
+        s = u ** 2 + v ** 2;
+    } while (s === 0 || s >= 1);
+
+    s = Math.sqrt((-2 * Math.log(s)) / s);
+
+    return s * u * standardDeviation + mean;
+}
+
+export const wrapNumber = (min, max, value) => {
+    const l = max - min + 1;
+    return ((((value - min) % l) + l) % l) + min;
 };
 
 export const clamp = (min, max, value) => {
@@ -19,18 +30,30 @@ export const clamp = (min, max, value) => {
 };
 
 export const shuffle = array => {
-    let currentIndex = array.length, temporaryValue, randomIndex;
+    const copy = [...array];
+    let current = copy.length,
+        temp,
+        rand;
     // While there remain elements to shuffle...
-    while (0 !== currentIndex) {
-      // Pick a remaining element...
-      randomIndex = Math.floor(Math.random() * currentIndex);
-      currentIndex -= 1;
-  
-      // And swap it with the current element.
-      temporaryValue = array[currentIndex];
-      array[currentIndex] = array[randomIndex];
-      array[randomIndex] = temporaryValue;
+    while (0 !== current) {
+        // Pick a remaining element...
+        rand = Math.floor(Math.random() * current);
+        current -= 1;
+
+        // And swap it with the current element.
+        temp = copy[current];
+        copy[current] = copy[rand];
+        copy[rand] = temp;
     }
-  
-    return array;
-  }
+
+    return copy;
+};
+
+export default {
+    selectRandom,
+    random,
+    gaussian,
+    clamp,
+    shuffle,
+    wrapNumber,
+};

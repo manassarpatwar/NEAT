@@ -1,5 +1,5 @@
-import Neat from "./src/Neat.js";
-import GraphNN from "./src/GraphNN.js";
+import Neat from "./src/Population.js";
+import GraphNN from "./graph/Graph.js";
 
 const inputs = [
     [0, 0],

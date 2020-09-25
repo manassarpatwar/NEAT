@@ -1,7 +1,7 @@
-import { randomGaussian, random, clamp } from "./utils";
+import { random, clamp, gaussian } from "./utils";
 
 export default class Connection {
-    constructor(form, to, weight = random(-2, 2), enabled = true, innovation = 0) {
+    constructor(form, to, weight, enabled = true, innovation = 0) {
         this.from = form;
         this.to = to;
         this.weight = weight;
@@ -16,13 +16,18 @@ export default class Connection {
         this.enabled = false;
     }
 
-    mutate(perturbProbability) {
-        if (Math.random() < perturbProbability) {
-            this.weight += randomGaussian();
-            //keep this.weight between bounds
-            this.weight = clamp(-2, 2, this.weight);
+    enable() {
+        this.enabled = true;
+    }
+
+    mutate(Config) {
+        const { power, weightPerturbed, maxWeight, perturb } = Config.mutation;
+
+        if (Math.random() < weightPerturbed) {
+            this.weight += perturb === "gaussian" ? gaussian() : random(-power, power);
+            this.weight = clamp(-maxWeight, maxWeight, this.weight);
         } else {
-            this.weight = random(-2, 2);
+            this.weight = random(-power, power);
         }
     }
 

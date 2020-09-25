@@ -1,5 +1,5 @@
 export default class InnovationHistory {
-    constructor(nodes=0) {
+    constructor(nodes = 0) {
         this.innovation = 0;
         this.nodes = nodes;
         this.history = [];
@@ -9,14 +9,15 @@ export default class InnovationHistory {
         for (const marker of this.history) {
             if (marker.from === connection.from.id && marker.to === connection.to.id) {
                 if (marker.node) {
-                    return marker.node.id;
+                    return marker.node;
                 } else {
                     const id = this.nodes++;
-                    marker.node = { id };
+                    marker.node = id;
                     return id;
                 }
             }
         }
+        console.error("node id error");
         return false; //error
     }
 

@@ -1,3 +1,5 @@
+import { selectRandom } from "./utils";
+
 export default class Node {
     constructor(type, id = 0) {
         this.type = type;
@@ -13,7 +15,11 @@ export default class Node {
     }
 
     activate() {
-        const sum = this.in.reduce((sum, con) => sum + con.from.output * con.weight, 0) || 0;
+        const sum = this.in.reduce(
+            (sum, con) => sum + con.from.output * con.weight * con.enabled,
+            0
+        );
+
         this.output = this.activation(sum);
     }
 
