@@ -1,5 +1,6 @@
 import Population from "../src/Population";
-import { shuffle } from "../src/utils";
+import Config from "../src/Config";
+import { gaussian, shuffle } from "../src/utils";
 
 const print = json => {
     return [...Object.keys(json)].map(k => `${k}: ${json[k]}`).join(" ");
@@ -23,7 +24,14 @@ const evaluate = genome => {
     genome.score *= genome.score;
 };
 
-const gen = 200;
+const gen = 300;
+
+const data = {
+    gen: 0,
+    averageNodes: 0,
+    averageConnections: 0,
+    averageGenerations: 0,
+};
 async function run(neat, verbose = false) {
     return new Promise(async resolve => {
         let totalSpecies = 0;
@@ -40,7 +48,12 @@ async function run(neat, verbose = false) {
             const log = {
                 Gen: neat.generation,
                 Genomes: neat.genomes.length,
-                "Number of species": neat.species.length,
+                // Species: neat.species
+                //     .map(s => s.id)
+                //     .sort((a, b) => a - b)
+                //     .join(","),
+                "Total species": neat.species.length,
+                "Best species size": neat.species[0].members.length,
                 "True Score": neat.champ.trueScore,
                 "Best Fitness": neat.champ.originalFitness,
                 Nodes: neat.champ.nodes.size,
@@ -49,6 +62,10 @@ async function run(neat, verbose = false) {
             history += "\n" + print(log);
             if (neat.champ.score > 15.9) {
                 beat = true;
+                data.averageConnections += neat.champ.connections.size;
+                data.averageNodes += neat.champ.nodes.size;
+                data.averageGenerations += neat.generation;
+                data.gen++;
             }
 
             if (verbose) {
@@ -90,20 +107,14 @@ async function run(neat, verbose = false) {
 }
 
 const test = async (verbose = false) => {
-    const neat = new Population(2, 1, 150, g => g.score / 16, {
+    const neat = new Population(2, 1, 150, g => g.score, {
         dropOffAge: 15,
-
-        mutation: {
-            connection: 0.05,
-            node: 0.03,
-            weight: 0.8,
-            weightPerturbed: 0.9,
-            mutateOnly: 0.25,
-            power: 2.5,
-            maxWeight: 8.0,
-            toggle: 0,
-            reEnable: 0,
-        },
+        adjustCompatibilityThreshold: false,
+        compatibilityModifierTarget: 30,
+        excessCoefficient: 2.0,
+        disjointCoefficient: 0.5,
+        weightDifferenceCoefficient: 1,
+        
     });
     run(neat, verbose);
 };
@@ -113,4 +124,9 @@ const xor = async (runs = 100) => {
 };
 
 // xor(1000);
+// console.log("\n");
+// data.averageConnections /= data.gen;
+// data.averageNodes /= data.gen;
+// data.averageGenerations /= data.gen;
+// console.log(print(data));
 test(true);

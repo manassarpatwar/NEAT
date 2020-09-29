@@ -1,4 +1,4 @@
-export { default as Neat } from "./Population";
+export { default as Population } from "./Population";
 export { default as Config } from "./Config";
 export { default as Genome } from "./Genome";
 export { default as Node } from "./Node";

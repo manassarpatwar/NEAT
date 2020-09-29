@@ -12,6 +12,7 @@ export default class Population {
         this.genomes = [];
         this.generation = 0;
         this.fitnessFunction = fitnessFunction;
+
         this.Config = {
             ...DefaultConfig,
             ...Config,
@@ -33,6 +34,7 @@ export default class Population {
 
         if (this.genomes.length > 1) {
             this.champ = this.getSuperChamp();
+            this.activeChamp = this.champ;
         }
     }
 
@@ -75,17 +77,18 @@ export default class Population {
         }
         species = shuffle(species);
 
-        const sum = species.reduce((acc, s) => acc + s.averageFitness, 0);
+        const sum = species.reduce((acc, s) => acc + s.totalFitness, 0);
         const r = random(0, sum);
         let cdf = 0;
 
         for (const s of species) {
-            cdf += s.averageFitness;
-            if (cdf > r) {
+            cdf += s.totalFitness;
+            if (cdf >= r) {
                 return s;
             }
         }
 
+        console.error("no species found");
         return species[0];
     }
 
@@ -97,6 +100,21 @@ export default class Population {
 
     epoch() {
         this.calculateFitness();
+
+        // Adjust compatibility threshold
+        if (
+            this.Config.adjustCompatibilityThreshold &&
+            this.species.length !== this.Config.compatibilityModifierTarget
+        ) {
+            this.Config.compatibilityThreshold +=
+                -this.Config.compatibilityModifier *
+                (this.species.length > this.Config.compatibilityModifierTarget ? -1 : 1);
+
+            this.Config.compatibilityThreshold = Math.max(
+                this.Config.compatibilityThreshold,
+                this.Config.compatibilityModifier
+            );
+        }
 
         this.champ = this.getSuperChamp();
 
@@ -110,26 +128,25 @@ export default class Population {
                 i--;
                 continue;
             }
-            species.adjustFitness(this.Config, this.champ);
+            species.adjustFitness(this.Config);
             species.sort();
             species.cull(this.Config);
-           
-            this.overallAverage += species.averageFitness;
+
+            this.overallAverage += species.totalFitness;
         }
 
-        for (const genome of this.genomes) {
-            genome.expectedOffspring = genome.kill
-                ? 0
-                : Math.round(genome.fitness / this.overallAverage);
-        }
+        const average = this.genomes.reduce((s, g) => s + g.fitness, 0) / this.genomes.length;
+
+        this.champ.expectedOffspring = this.champ.fitness / average;
 
         this.species.sort((a, b) => b.bestFitness - a.bestFitness);
 
         // Reproduce all species
         const allSpecies = [...this.species];
+
         for (const species of allSpecies) {
             species.expectedOffspring = Math.round(
-                (species.averageFitness / this.overallAverage) * this.size
+                (species.totalFitness / this.overallAverage) * this.size
             );
 
             species.reproduce(this);
@@ -148,18 +165,22 @@ export default class Population {
             this.genomes.push(...species.members);
         }
 
-        while (this.genomes.length > this.size) {
-            const genome = selectRandom(this.genomes);
-            genome.species.remove(genome);
-            this.remove(genome);
-        }
-
-        while (this.genomes.length < this.size) {
+        while (this.genomes.length < this.size - 1) {
             const genome = this.getRandomSpecies().getRandomMember().copy();
             genome.mutate(this.InnovationHistory, this.Config);
             this.classify(genome);
             this.genomes.push(genome);
         }
+
+        while (this.genomes.length > this.size - 1) {
+            const genome = selectRandom(this.genomes);
+            genome.species.remove(genome);
+            this.remove(genome);
+        }
+
+        this.activeChamp = this.champ.copy();
+        this.genomes.push(this.activeChamp);
+        this.classify(this.activeChamp);
 
         this.generation++;
         return true;

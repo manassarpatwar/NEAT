@@ -16,6 +16,7 @@ export default class Species {
         this.averageFitness = 0;
         this.bestFitness = 0;
         this.totalFitness = 0;
+
         this.ageOfLastImprovement = 0;
         this.expectedOffsprings = 0;
         this.color = [50 + Math.random() * 150, 50 + Math.random() * 150, 50 + Math.random() * 150];
@@ -45,33 +46,26 @@ export default class Species {
         return this.members[0];
     }
 
-    getRandomMember(exclude = null) {
-        let members = this.members;
-        if (this.members.length > 1 && exclude) {
-            members = this.members.filter(m => m !== exclude);
-        }
-        members = shuffle(members);
+    getRandomMember() {
+        const members = shuffle(this.members);
 
-        const sum = members.reduce((s, m) => s + m.originalFitness, 0);
+        const sum = members.reduce((s, m) => s + m.fitness, 0);
         const r = random(0, sum);
         let cdf = 0;
 
         for (const member of members) {
-            cdf += member.originalFitness;
-            if (cdf > r) {
+            cdf += member.fitness;
+            if (cdf >= r) {
                 return member;
             }
         }
 
+        console.error("no member found");
         return members[0];
     }
 
-    adjustFitness(Config, superChamp) {
-        if (superChamp.species === this) {
-            this.extinct = false;
-        } else {
-            this.extinct = this.age - this.ageOfLastImprovement + 1 > Config.dropOffAge;
-        }
+    adjustFitness(Config) {
+        this.extinct = this.age - this.ageOfLastImprovement + 1 > Config.dropOffAge;
 
         this.totalFitness = 0;
         for (const member of this.members) {
@@ -87,13 +81,13 @@ export default class Species {
                 member.fitness *= Config.ageSignificance;
             }
 
+            member.fitness /= this.members.length;
             this.totalFitness += member.fitness;
         }
-        this.averageFitness = this.totalFitness / this.members.length;
     }
 
     sort() {
-        this.members.sort((a, b) => b.originalFitness - a.originalFitness);
+        this.members.sort((a, b) => b.fitness - a.fitness);
         this.specimen = selectRandom(this.members);
 
         // update age of last improvement
@@ -104,7 +98,7 @@ export default class Species {
     }
 
     cull(Config) {
-        const cull = Math.floor(this.members.length * Config.survivalThreshold+1);
+        const cull = Math.floor(this.members.length * Config.survivalThreshold + 1);
 
         for (let i = cull; i < this.members.length; i++) {
             this.members.splice(i, 1);
@@ -119,18 +113,20 @@ export default class Species {
         const champ = this.getChampion();
         let champAdded = false;
 
+        if (this.expectedOffspring === 0) {
+            return;
+        }
+
         for (let i = 0; i < this.expectedOffspring; i++) {
             let baby;
             if (superChamp && superChamp === champ && superChamp.expectedOffspring > 0) {
                 // If we have a population champion, finish off some special clones
                 const genome = superChamp.copy();
-
-                if (superChamp.expectedOffspring === 1) {
+                if (superChamp.expectedOffspring < 1) {
                     genome.mutate(InnovationHistory, Config);
                 }
 
                 superChamp.expectedOffspring--;
-
                 baby = genome;
             } else if (!champAdded && this.expectedOffspring > 5) {
                 // Champion of species with more than 5 networks is copied unchanged
@@ -147,13 +143,24 @@ export default class Species {
                 let dad;
 
                 if (Math.random() > Config.interspeciesMateRate) {
-                    dad = this.getRandomMember(mom);
+                    dad = this.getRandomMember();
                 } else {
                     dad = population.getRandomSpecies(this).getRandomMember();
                 }
 
-                baby = Genome.crossover(dad, mom);
-                baby.mutate(InnovationHistory, Config);
+                if (mom === dad) {
+                    baby = mom.copy();
+                } else {
+                    baby = Genome.crossover(dad, mom);
+                }
+
+                if (
+                    Math.random() > Config.mutation.mateOnly ||
+                    mom === dad ||
+                    Genome.compatibility(mom, dad, Config) === 0
+                ) {
+                    baby.mutate(InnovationHistory, Config);
+                }
             }
             const found = population.species.some(species => {
                 const isCompatible = species.contains(baby, Config);

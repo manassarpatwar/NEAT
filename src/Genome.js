@@ -97,20 +97,29 @@ export default class Genome {
             }
             for (const con of node.out) {
                 removed.add(con.innovation);
-                if (
-                    con.enabled &&
-                    con.to.type === HIDDEN &&
-                    con.to.in.every(edge => removed.has(edge.innovation))
-                ) {
+                if (con.to.in.every(edge => removed.has(edge.innovation))) {
                     nodes.push(con.to);
                 }
             }
+        }
+        const hidden = [...this.nodes.values()].filter(n => n.type === HIDDEN);
+        if (this.hidden.length !== hidden.length) {
+            console.error("network has a cycle");
+            console.error(
+                hidden.map(h => ({ id: h.id })),
+                " | ",
+                this.hidden.map(h => ({ id: h.id }))
+            );
         }
     }
 
     addNode(node, connection, InnovationHistory) {
         node.id = InnovationHistory.getNodeId(connection);
+        if (this.nodes.has(node.id)) {
+            return false;
+        }
         this.nodes.set(node.id, node);
+        return true;
     }
 
     addConnection(connection, InnovationHistory) {
@@ -139,18 +148,22 @@ export default class Genome {
     }
 
     mutateAddNode(InnovationHistory) {
-        const connection = selectRandom([...this.connections.values()].filter(c => c.enabled));
+        const connections = [...this.connections.values()].filter(c => c.enabled);
+        const connection = selectRandom(connections);
+
         if (connection) {
             const node = new Node(HIDDEN);
-            connection.disable();
 
-            this.addNode(node, connection, InnovationHistory);
+            const valid = this.addNode(node, connection, InnovationHistory);
+            if (valid) {
+                connection.disable();
 
-            this.addConnection(new Connection(connection.from, node, 1), InnovationHistory);
-            this.addConnection(
-                new Connection(node, connection.to, connection.weight),
-                InnovationHistory
-            );
+                this.addConnection(new Connection(connection.from, node, 1.0), InnovationHistory);
+                this.addConnection(
+                    new Connection(node, connection.to, connection.weight),
+                    InnovationHistory
+                );
+            }
             return true;
         }
         return false;
@@ -166,10 +179,10 @@ export default class Genome {
                 nodes.filter(node => node.type !== INPUT && node.type !== BIAS && node !== from)
             );
 
-            const isValid =
+            const valid =
                 from && to && !this.connectionExists(from, to) && !this.isRecurrent(from, to);
 
-            if (isValid) {
+            if (valid) {
                 const connection = new Connection(
                     from,
                     to,
@@ -219,32 +232,38 @@ export default class Genome {
     mutate(InnovationHistory, Config) {
         let sort = false;
 
-        const r = Math.random()
-        if (r < (Config.mutation.connection || 0)) {
-            sort = sort || this.mutateAddConnection(InnovationHistory, Config);
-        }
-        if (r < (Config.mutation.node || 0)) {
+        if (Math.random() < (Config.mutation.node || 0)) {
             sort = sort || this.mutateAddNode(InnovationHistory);
+        } else if (Math.random() < (Config.mutation.connection || 0)) {
+            sort = sort || this.mutateAddConnection(InnovationHistory, Config);
+        } else {
+            if (Math.random() < (Config.mutation.weight || 0)) {
+                this.mutateWeights(Config);
+            }
+            if (Math.random() < (Config.mutation.toggle || 0)) {
+                this.mutateToggleEnable();
+            }
+            if (Math.random() < (Config.mutation.reEnable || 0)) {
+                this.mutateReEnable();
+            }
         }
-        if (r < (Config.mutation.weight || 0)) {
-            this.mutateWeights(Config);
-        }
-        if (r < (Config.mutation.toggle || 0)) {
-            sort = sort || this.mutateToggleEnable();
-        }
-        if (r < (Config.mutation.reEnable || 0)) {
-            sort = sort || this.mutateReEnable();
-        }
-
         if (sort) {
             this.sortNetwork();
         }
     }
 
-    graph() {
+    graph(width, height, pad = { x: 0, y: 0 }) {
         const network = [];
-        network[0] = this.inputs.map(n => {
+        network[0] = this.inputs.map((n, y) => {
             n.layer = 0;
+            n.vector = {
+                x: width * pad.x,
+                y:
+                    this.inputs.length > 1
+                        ? pad.y * height +
+                          (((1 - 2 * pad.y) * height) / (this.inputs.length + 1)) * (y + 1)
+                        : 0.5 * height,
+            };
             return n;
         });
 
@@ -256,9 +275,34 @@ export default class Genome {
             }
             network[layer].push(node);
         }
+
+        const hidden = network.length - 1;
+        for (let x = 1; x < network.length; x++) {
+            const layer = network[x];
+            for (let y = 0; y < layer.length; y++) {
+                const node = layer[y];
+                node.vector = {
+                    x: width * pad.x + ((width * (1 - 2 * pad.x)) / (hidden + 1)) * x,
+                    y:
+                        layer.length > 1
+                            ? pad.y * height +
+                              (((1 - 2 * pad.y) * height) / (layer.length + 1)) * (y + 1)
+                            : height * 0.5,
+                };
+            }
+        }
+
         network.push(
-            this.outputs.map(n => {
+            this.outputs.map((n, y) => {
                 n.layer = network.length;
+                n.vector = {
+                    x: width * (1 - pad.x),
+                    y:
+                        this.outputs.length > 1
+                            ? pad.y * height +
+                              (((1 - 2 * pad.y) * height) / (this.outputs.length + 1)) * (y + 1)
+                            : height * 0.5,
+                };
                 return n;
             })
         );
@@ -268,37 +312,53 @@ export default class Genome {
 
     static crossover(genome1, genome2) {
         //assuming genome1 is more fit than genome2
-        if (genome1.fitness < genome2.fitness) {
+        if (genome1.originalFitness < genome2.originalFitness) {
             const temp = genome1;
             genome1 = genome2;
             genome2 = temp;
         }
 
         const child = new Genome();
+
+        // Ensure that all sensors and ouputs are added to the organism
         genome1.nodes.forEach((node, key) => {
-            child.nodes.set(key, node.copy());
+            if (node.type === BIAS || node.type === INPUT || node.type === OUTPUT) {
+                child.nodes.set(key, node.copy());
+            }
         });
 
-        for (const innovation of genome1.connections.keys()) {
+        const innovationNumbers = [
+            ...new Set([...genome1.connections.keys(), ...genome2.connections.keys()]),
+        ].sort((a, b) => a - b);
+
+        for (const innovation of innovationNumbers) {
             const con1 = genome1.connections.get(innovation);
             const con2 = genome2.connections.get(innovation);
 
             const matching = con1 && con2;
-
             const con = matching ? (Math.random() > 0.5 ? con1 : con2) : con1;
-            const from = child.nodes.get(con.from.id);
 
-            const to = child.nodes.get(con.to.id);
-
-            const copy = con.copy(from, to);
-
-            copy.enable();
-            if (matching && (!con1.enabled || !con2.enabled)) {
-                if (Math.random() < 0.75) {
-                    copy.disable();
+            if (con) {
+                let from = child.nodes.get(con.from.id);
+                if (!from) {
+                    from = con.from.copy();
+                    child.nodes.set(from.id, from);
                 }
+                let to = child.nodes.get(con.to.id);
+                if (!to) {
+                    to = con.to.copy();
+                    child.nodes.set(to.id, to);
+                }
+
+                const trait = con.copy(from, to);
+                trait.enable();
+                if (matching && (!con1.enabled || !con2.enabled)) {
+                    if (Math.random() < 0.75) {
+                        trait.disable();
+                    }
+                }
+                child.connections.set(innovation, trait);
             }
-            child.connections.set(innovation, copy);
         }
 
         child.initializeNetwork();
@@ -315,6 +375,8 @@ export default class Genome {
         let disjoint = 0;
         const matching = [];
         const smaller = Math.min(Math.max(...connections1), Math.max(...connections2));
+
+        const N = Math.max(connections1.length, connections2.length, 1);
 
         for (const innovation of innovationNumbers) {
             const con1 = genome1.connections.get(innovation);
@@ -334,8 +396,8 @@ export default class Genome {
         const weightDiff = matching.reduce((a, b) => a + b, 0) / matching.length || 0;
 
         const distance =
-            excess * Config.excessCoefficient +
-            disjoint * Config.disjointCoefficient +
+            (excess * Config.excessCoefficient) / N +
+            (disjoint * Config.disjointCoefficient) / N +
             weightDiff * Config.weightDifferenceCoefficient;
 
         if (verbose) {

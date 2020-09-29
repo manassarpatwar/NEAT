@@ -46,16 +46,16 @@ test("Genome compatibility distance", t => {
         InnovationHistory
     );
     con = new Connection(genome2.nodes.get(2), genome2.nodes.get(4), 1, false);
-    genome2.addNode(new Node(types.HIDDEN), con, InnovationHistory);
     genome2.addConnection(con, InnovationHistory);
-
     genome2.addConnection(
         new Connection(genome2.nodes.get(3), genome2.nodes.get(4)),
         InnovationHistory
     );
 
+    genome2.addNode(new Node(types.HIDDEN), con, InnovationHistory);
+
     con = new Connection(genome2.nodes.get(2), genome2.nodes.get(5));
-    con.innovation = InnovationHistory.getInnovation(con);
+    genome2.addConnection(con, InnovationHistory);
     genome2.addConnection(
         new Connection(genome2.nodes.get(2), genome2.nodes.get(5)),
         InnovationHistory
@@ -63,6 +63,7 @@ test("Genome compatibility distance", t => {
 
     con = new Connection(genome2.nodes.get(5), genome2.nodes.get(4), 1, false);
     genome2.addConnection(con, InnovationHistory);
+
     genome2.addNode(new Node(types.HIDDEN), con, InnovationHistory);
 
     genome2.addConnection(
@@ -73,6 +74,7 @@ test("Genome compatibility distance", t => {
         new Connection(genome2.nodes.get(6), genome2.nodes.get(4)),
         InnovationHistory
     );
+
     genome1.addConnection(
         new Connection(genome1.nodes.get(1), genome1.nodes.get(5)),
         InnovationHistory
@@ -88,6 +90,14 @@ test("Genome compatibility distance", t => {
 
     genome2.sortNetwork();
 
+    console.log(
+        genome2.graph(100, 100).map(layer =>
+            layer.map(node => ({
+                id: node.id,
+                ...node.vector,
+            }))
+        )
+    );
     const { matching, disjoint, excess } = Genome.compatibility(
         genome1,
         genome2,
@@ -190,7 +200,7 @@ test("Genome activate", t => {
         InnovationHistory
     );
 
-    genome.initializeNetwork();
+    genome.sortNetwork();
     const [output] = genome.activate([1, 1, 1]);
     t.is(output, 0.999999587075229);
 });
