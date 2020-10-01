@@ -5,7 +5,7 @@ import Node from "../src/Node";
 import Connection from "../src/Connection";
 import types from "../src/types";
 
-test("Genome compatibility distance", t => {
+test("Genome compatibility distance & genome crossover", t => {
     const inputs = 3;
     const outputs = 1;
     const neat = new Neat(inputs, outputs);
@@ -88,21 +88,21 @@ test("Genome compatibility distance", t => {
         InnovationHistory
     );
 
-    genome2.sortNetwork();
-
-    console.log(
-        genome2.graph(100, 100).map(layer =>
-            layer.map(node => ({
-                id: node.id,
-                ...node.vector,
-            }))
-        )
-    );
     const { matching, disjoint, excess } = Genome.compatibility(
         genome1,
         genome2,
         neat.Config,
         true
+    );
+    genome1.originalFitness = 1;
+    genome2.originalFitness = 1;
+    console.log(
+        [...Genome.crossover(genome1, genome2).connections.values()].map(c => ({
+            f: c.from.id,
+            t: c.to.id,
+            i: c.innovation,
+            e: c.enabled,
+        }))
     );
     t.is(excess, 2);
     t.is(disjoint, 3);

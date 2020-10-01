@@ -33,8 +33,9 @@ export default class Population {
         }
 
         if (this.genomes.length > 1) {
-            this.champ = this.getSuperChamp();
-            this.activeChamp = this.champ;
+            const champ = this.getSuperChamp();
+            this.champ = champ.copy();
+            this.champ.species = champ.species;
         }
     }
 
@@ -75,14 +76,13 @@ export default class Population {
         if (this.species.length > 1 && exclude) {
             species = this.species.filter(s => s !== exclude);
         }
-        species = shuffle(species);
 
-        const sum = species.reduce((acc, s) => acc + s.totalFitness, 0);
+        const sum = species.reduce((acc, s) => acc + s.bestFitness, 0);
         const r = random(0, sum);
         let cdf = 0;
 
         for (const s of species) {
-            cdf += s.totalFitness;
+            cdf += s.bestFitness;
             if (cdf >= r) {
                 return s;
             }
@@ -165,22 +165,18 @@ export default class Population {
             this.genomes.push(...species.members);
         }
 
-        while (this.genomes.length < this.size - 1) {
+        while (this.genomes.length < this.size) {
             const genome = this.getRandomSpecies().getRandomMember().copy();
             genome.mutate(this.InnovationHistory, this.Config);
             this.classify(genome);
             this.genomes.push(genome);
         }
 
-        while (this.genomes.length > this.size - 1) {
+        while (this.genomes.length > this.size) {
             const genome = selectRandom(this.genomes);
             genome.species.remove(genome);
             this.remove(genome);
         }
-
-        this.activeChamp = this.champ.copy();
-        this.genomes.push(this.activeChamp);
-        this.classify(this.activeChamp);
 
         this.generation++;
         return true;

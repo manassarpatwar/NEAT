@@ -47,13 +47,11 @@ export default class Species {
     }
 
     getRandomMember() {
-        const members = shuffle(this.members);
-
-        const sum = members.reduce((s, m) => s + m.fitness, 0);
+        const sum = this.members.reduce((s, m) => s + m.fitness, 0);
         const r = random(0, sum);
         let cdf = 0;
 
-        for (const member of members) {
+        for (const member of this.members) {
             cdf += member.fitness;
             if (cdf >= r) {
                 return member;
@@ -61,7 +59,7 @@ export default class Species {
         }
 
         console.error("no member found");
-        return members[0];
+        return this.members[0];
     }
 
     adjustFitness(Config) {

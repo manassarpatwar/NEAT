@@ -24,13 +24,15 @@ const evaluate = genome => {
     genome.score *= genome.score;
 };
 
-const gen = 300;
+const gen = 150;
 
 const data = {
     gen: 0,
     averageNodes: 0,
     averageConnections: 0,
     averageGenerations: 0,
+    averageSpecies: 0,
+    optimal: 0,
 };
 async function run(neat, verbose = false) {
     return new Promise(async resolve => {
@@ -66,12 +68,16 @@ async function run(neat, verbose = false) {
                 data.averageNodes += neat.champ.nodes.size;
                 data.averageGenerations += neat.generation;
                 data.gen++;
+                if (neat.champ.nodes.size === 5) {
+                    data.optimal++;
+                }
             }
 
             if (verbose) {
                 console.log(print(log));
             }
         }
+        data.averageSpecies += totalSpecies / neat.generation;
         if (verbose) {
             console.log("\n" + "-".repeat(100));
             console.log("Average species: " + totalSpecies / neat.generation);
@@ -114,7 +120,6 @@ const test = async (verbose = false) => {
         excessCoefficient: 2.0,
         disjointCoefficient: 0.5,
         weightDifferenceCoefficient: 1,
-        
     });
     run(neat, verbose);
 };
@@ -123,10 +128,11 @@ const xor = async (runs = 100) => {
     await Promise.all([...new Array(runs)].map(_ => test()));
 };
 
-// xor(1000);
-// console.log("\n");
-// data.averageConnections /= data.gen;
-// data.averageNodes /= data.gen;
-// data.averageGenerations /= data.gen;
-// console.log(print(data));
-test(true);
+xor(100);
+console.log("\n");
+data.averageConnections /= data.gen;
+data.averageNodes /= data.gen;
+data.averageGenerations /= data.gen;
+data.averageSpecies /= data.gen;
+console.log(print(data));
+// test(true);

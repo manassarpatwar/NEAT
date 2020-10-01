@@ -318,6 +318,8 @@ export default class Genome {
             genome2 = temp;
         }
 
+        const equal = genome1.originalFitness === genome2.originalFitness;
+
         const child = new Genome();
 
         // Ensure that all sensors and ouputs are added to the organism
@@ -336,29 +338,40 @@ export default class Genome {
             const con2 = genome2.connections.get(innovation);
 
             const matching = con1 && con2;
-            const con = matching ? (Math.random() > 0.5 ? con1 : con2) : con1;
+            const con = matching
+                ? Math.random() > 0.5
+                    ? con1
+                    : con2
+                : equal
+                ? con1 || con2
+                : con1;
 
-            if (con) {
-                let from = child.nodes.get(con.from.id);
-                if (!from) {
-                    from = con.from.copy();
-                    child.nodes.set(from.id, from);
-                }
-                let to = child.nodes.get(con.to.id);
-                if (!to) {
-                    to = con.to.copy();
-                    child.nodes.set(to.id, to);
-                }
-
-                const trait = con.copy(from, to);
-                trait.enable();
-                if (matching && (!con1.enabled || !con2.enabled)) {
-                    if (Math.random() < 0.75) {
-                        trait.disable();
-                    }
-                }
-                child.connections.set(innovation, trait);
+            if (!con) {
+                continue;
             }
+
+            let from = child.nodes.get(con.from.id);
+            if (!from) {
+                from = con.from.copy();
+                child.nodes.set(from.id, from);
+            }
+            let to = child.nodes.get(con.to.id);
+            if (!to) {
+                to = con.to.copy();
+                child.nodes.set(to.id, to);
+            }
+
+            if (child.isRecurrent(from, to)) {
+                continue;
+            }
+            const trait = con.copy(from, to);
+            trait.enable();
+            if (matching && (!con1.enabled || !con2.enabled)) {
+                if (Math.random() < 0.75) {
+                    trait.disable();
+                }
+            }
+            child.connections.set(innovation, trait);
         }
 
         child.initializeNetwork();
@@ -377,7 +390,6 @@ export default class Genome {
         const smaller = Math.min(Math.max(...connections1), Math.max(...connections2));
 
         const N = Math.max(connections1.length, connections2.length, 1);
-
         for (const innovation of innovationNumbers) {
             const con1 = genome1.connections.get(innovation);
             const con2 = genome2.connections.get(innovation);
