@@ -1,82 +1,38 @@
-const randomGaussian = (min, max, skew) => {
-    let u = 0,
-        v = 0;
-    while (u === 0) u = Math.random(); //Converting [0,1) to (0,1)
-    while (v === 0) v = Math.random();
-    let num = Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
-
-    num = num / 10.0 + 0.5; // Translate to 0 -> 1
-    if (num > 1 || num < 0) num = randomGaussian(min, max, skew); // resample between 0 and 1 if out of range
-    num = Math.pow(num, skew); // Skew
-    num *= max - min; // Stretch to fill range
-    num += min; // offset to min
-    return num;
-};
+import { random, clamp, gaussian } from "./utils";
 
 export default class Connection {
-    inNode;
-    outNode;
-    weight;
-    innovationNo;
-    enabled;
-
-    constructor(inNode, outNode, innovationNo, weight, enabled) {
-        this.inNode = inNode;
-        this.outNode = outNode;
-        this.innovationNo = innovationNo;
-        this.enabled = enabled;
+    constructor(from, to, weight, enabled = true, innovation = 0) {
+        this.from = from;
+        this.to = to;
         this.weight = weight;
-    }
+        this.enabled = enabled;
+        this.innovation = innovation;
 
-    isEnabled() {
-        return this.enabled;
-    }
-
-    isDisabled() {
-        return !this.enabled;
-    }
-
-    enable() {
-        this.enabled = true;
+        this.to.addInConnection(this);
+        this.from.addOutConnection(this);
     }
 
     disable() {
         this.enabled = false;
     }
 
-    getInnovationNo() {
-        return this.innovationNo;
+    enable() {
+        this.enabled = true;
     }
 
-    mutateWeight() {
-        if (Math.random() < 0.1) this.weight = Math.random() * 2 - 1;
-        else {
-            this.weight += randomGaussian(-1, 1, 1) * this.weight;
-            //keep this.weight between bounds
-            if (this.weight > 1) {
-                this.weight = 1;
-            }
-            if (this.weight < -1) {
-                this.weight = -1;
-            }
+    mutate(Config) {
+        const { power, weightPerturbed, maxWeight } = Config.mutation;
+
+        if (Math.random() < weightPerturbed) {
+            this.weight += random(-power, power);
+            this.weight = clamp(-maxWeight, maxWeight, this.weight);
+        } else {
+            this.weight = random(-power, power);
         }
     }
 
-    setWeight(w) {
-        this.weight = w;
-    }
-
-    getWeight() {
-        return this.weight;
-    }
-
-    copy() {
-        return new Connection(
-            this.inNode,
-            this.outNode,
-            this.innovationNo,
-            this.weight,
-            this.enabled
-        );
+    copy(from, to) {
+        //important that the from and to are the new nodes and not the old
+        return new Connection(from, to, this.weight, this.enabled, this.innovation);
     }
 }

@@ -1,416 +1,427 @@
-import InnovationCounter from "./InnovationCounter.js";
-import Connection from "./Connection.js";
-import Node from "./Node.js";
-import ConnectionHistory from "./ConnectionHistory.js";
+import Connection from "./Connection";
+import Node from "./Node";
+import { OUTPUT, INPUT, HIDDEN, BIAS } from "./types";
+import { selectRandom, random } from "./utils";
 
 export default class Genome {
-    constructor(numInputs, numOutputs) {
+    constructor() {
         this.nodes = new Map();
         this.connections = new Map();
-        this.numberOfNodes = 0;
-
         this.score = 0;
         this.fitness = 0;
+        this.originalFitness = 0;
+    }
 
-        this.numInputs = numInputs;
-        this.numOutputs = numOutputs;
+    buildNetwork(inputs, outputs, InnovationHistory = null, Config = null) {
+        const bias = new Node(BIAS, 0);
+        this.nodes.set(bias.id, bias);
 
-        this.layers = 2;
-        this.biasNode = new Node(0, "BIAS");
-        this.biasNode.layer = 0;
-        this.addNode(this.biasNode);
-
-        if (numInputs != null && numOutputs != null) {
-            const inputs = [];
-            const outputs = [];
-            for (let i = 0; i < numInputs; i++) {
-                const inputNode = new Node(this.numberOfNodes, "INPUT");
-                inputs[i] = inputNode;
-                inputNode.layer = 0;
-                this.addNode(inputNode);
-            }
-
-            for (let j = 0; j < numOutputs; j++) {
-                const outputNode = new Node(this.numberOfNodes, "OUTPUT");
-                outputs[j] = outputNode;
-                this.addNode(outputNode);
-                outputNode.layer = 1;
-            }
+        for (let i = 0; i < inputs; i++) {
+            const node = new Node(INPUT, i + 1);
+            this.nodes.set(node.id, node);
         }
-    }
 
-    calculateFitness() {
-        this.fitness = this.score / 4;
-    }
+        for (let j = 0; j < outputs; j++) {
+            const node = new Node(OUTPUT, j + inputs + 1);
+            this.nodes.set(node.id, node);
+        }
 
-    fullyConnect(innovationHistory) {
-        for (const n1 of this.nodes.values()) {
-            for (const n2 of this.nodes.values()) {
-                if (n2.layer == n1.layer + 1) {
-                    const innovationNumber = this.getInnovationNumber(
-                        innovationHistory,
-                        n1.getNodeNumber(),
-                        n2.getNodeNumber()
-                    );
+        this.initializeNetwork();
+        if (InnovationHistory && Config) {
+            // fully connect
+            for (const input of this.inputs) {
+                //including bias node
+                for (const output of this.outputs) {
                     this.addConnection(
                         new Connection(
-                            n1.getNodeNumber(),
-                            n2.getNodeNumber(),
-                            innovationNumber,
-                            Math.random() * 2 - 1,
-                            true
-                        )
+                            input,
+                            output,
+                            random(-Config.mutation.power, Config.mutation.power)
+                        ),
+                        InnovationHistory
                     );
                 }
             }
         }
     }
 
-    clone() {
-        const g = new Genome();
-        for (const n of this.nodes.values()) {
-            g.addNode(n.copy());
-        }
-        for (const c of this.connections.values()) {
-            g.addConnection(c.copy());
-        }
-
-        g.numInputs = this.numInputs;
-        g.numOutputs = this.numOutputs;
-        g.numberOfNodes = this.numberOfNodes;
-        g.layers = this.layers;
-        return g;
+    initializeNetwork() {
+        this.inputs = [];
+        this.outputs = [];
+        this.nodes.forEach(node => {
+            if (node.type === BIAS || node.type === INPUT) {
+                this.inputs.push(node);
+            } else if (node.type === OUTPUT) {
+                this.outputs.push(node);
+            }
+        });
+        this.sortNetwork();
     }
 
-    feedForward(inputs) {
-        this.nodes.get(0).outputValue = 1;
+    copy() {
+        const genome = new Genome();
 
-        for (let i = 0; i < this.numInputs; i++) {
-            this.nodes.get(i + 1).outputValue = inputs[i];
-        }
+        this.nodes.forEach((node, key) => {
+            genome.nodes.set(key, node.copy());
+        });
 
-        //for each layer add the node in that layer, since layers cannot connect to themselves there is no need to order the this.nodes within a layer
+        this.connections.forEach((connection, key) => {
+            const from = genome.nodes.get(connection.from.id);
+            const to = genome.nodes.get(connection.to.id);
+            genome.connections.set(key, connection.copy(from, to));
+        });
 
-        for (let i = 1; i < this.layers; i++) {
-            for (const n of this.nodes.values()) {
-                if (n.layer == i) {
-                    for (const c of this.connections.values()) {
-                        if (c.outNode == n.getNodeNumber()) {
-                            // console.log(c.inNode + " "+ c.weight);
-                            n.inputSum +=
-                                this.nodes.get(c.inNode).outputValue * c.weight;
-                        }
-                    }
-                    n.activate();
+        genome.initializeNetwork();
+        return genome;
+    }
+
+    activate(activations) {
+        const inputs = [1, ...activations];
+
+        this.inputs.forEach(node => (node.output = inputs.shift()));
+
+        this.hidden.forEach(node => node.activate()); //already sorted by topology
+        this.outputs.forEach(node => node.activate());
+
+        return this.outputs.map(node => node.output);
+    }
+
+    sortNetwork() {
+        this.hidden = [];
+        const removed = new Set();
+        const nodes = [...this.inputs];
+        while (nodes.length) {
+            const node = nodes.shift();
+            if (node.type === HIDDEN) {
+                this.hidden.push(node);
+            }
+            for (const con of node.out) {
+                removed.add(con.innovation);
+                if (con.to.in.every(edge => removed.has(edge.innovation))) {
+                    nodes.push(con.to);
                 }
             }
         }
-
-        const outputs = [];
-        for (
-            let i = this.numInputs + 1;
-            i < this.numInputs + this.numOutputs + 1;
-            i++
-        ) {
-            outputs.push(this.nodes.get(i).outputValue);
-        }
-
-        for (const n of this.nodes.values()) {
-            n.reset();
-        }
-
-        return outputs;
-    }
-
-    computeNodeCoordinates(width, height) {
-        const layers = [];
-        for (const n of this.nodes.values()) {
-            layers[n.layer] = [];
-        }
-        for (const n of this.nodes.values()) {
-            layers[n.layer].push(n);
-        }
-        const maxNodesPerLayer = Math.max(...layers.map(l => l.length));
-        let x = width / (layers.length + 1);
-
-        for (const l of layers) {
-            let y = height / (l.length + 1);
-            for (const n of l) {
-                n.vector = { x, y };
-                n.radius = height / (maxNodesPerLayer*10);
-                y += height / (l.length + 1);
-            }
-            x += width / (layers.length + 1);
-        }
-        return layers;
-    }
-
-    addNode(node) {
-        this.nodes.set(node.getNodeNumber(), node);
-        this.numberOfNodes++;
-    }
-
-    addConnection(con) {
-        this.connections.set(con.getInnovationNo(), con);
-    }
-
-    getInnovationNumber(innovationHistory, from, to) {
-        let isNew = true;
-        let connectionInnovationNumber = InnovationCounter.innovationNumber;
-        for (let i = 0; i < innovationHistory.length; i++) {
-            //for each previous mutation
-            if (innovationHistory[i].matches(this, from, to)) {
-                //if match found
-                isNew = false; //its not a new mutation
-                connectionInnovationNumber =
-                    innovationHistory[i].innovationNumber; //set the innovation number as the innovation number of the match
-                break;
-            }
-        }
-
-        if (isNew) {
-            //if the mutation is new then create an arrayList of varegers representing the current state of the genome
-            const innoNumbers = [];
-            for (const c of this.connections.values()) {
-                //set the innovation numbers
-                innoNumbers.push(c.getInnovationNo());
-            }
-
-            //then add this mutation to the innovationHistory
-            innovationHistory.push(
-                new ConnectionHistory(
-                    from,
-                    to,
-                    connectionInnovationNumber,
-                    innoNumbers
-                )
+        const hidden = [...this.nodes.values()].filter(n => n.type === HIDDEN);
+        if (this.hidden.length !== hidden.length) {
+            console.error("network has a cycle");
+            console.error(
+                hidden.map(h => ({ id: h.id })),
+                " | ",
+                this.hidden.map(h => ({ id: h.id }))
             );
-            InnovationCounter.getInnovation();
-        }
-        return connectionInnovationNumber;
-    }
-
-    mutateNode(innovationHistory) {
-        const keys = Array.from(this.connections.keys());
-        if (keys.length == 0) return;
-        const randCon = this.connections.get(
-            keys[Math.floor(Math.random() * keys.length)]
-        );
-
-        const newNode = new Node(this.numberOfNodes, "HIDDEN");
-
-        let connectionInnovationNumber = this.getInnovationNumber(
-            innovationHistory,
-            randCon.inNode,
-            newNode.getNodeNumber()
-        );
-
-        const toNodeCon = new Connection(
-            randCon.inNode,
-            newNode.getNodeNumber(),
-            connectionInnovationNumber,
-            Math.random() * 2 - 1,
-            true
-        );
-
-        connectionInnovationNumber = this.getInnovationNumber(
-            innovationHistory,
-            newNode.getNodeNumber(),
-            randCon.outNode
-        );
-        const fromNodeCon = new Connection(
-            newNode.getNodeNumber(),
-            randCon.outNode,
-            connectionInnovationNumber,
-            Math.random() * 2 - 1,
-            true
-        );
-        newNode.layer = this.nodes.get(randCon.inNode).layer + 1;
-
-        this.addConnection(toNodeCon);
-        this.addConnection(fromNodeCon);
-
-        connectionInnovationNumber = this.getInnovationNumber(
-            innovationHistory,
-            this.biasNode.getNodeNumber(),
-            newNode.getNodeNumber()
-        );
-        this.addConnection(
-            new Connection(
-                this.biasNode.getNodeNumber(),
-                newNode.getNodeNumber(),
-                connectionInnovationNumber,
-                0,
-                true
-            )
-        );
-
-        if (newNode.layer == this.nodes.get(randCon.outNode).layer) {
-            for (const n of this.nodes.values()) {
-                //dont include this newest node
-                if (n.layer >= newNode.layer) {
-                    n.layer++;
-                }
-            }
-            this.layers++;
-        }
-
-        this.addNode(newNode);
-        randCon.disable();
-    }
-
-    mutateConnection(innovationHistory) {
-        const keys = Array.from(this.nodes.keys());
-        let n1 = this.nodes.get(keys[Math.floor(Math.random() * keys.length)]);
-        let n2 = this.nodes.get(keys[Math.floor(Math.random() * keys.length)]);
-
-        while (n1.layer == n2.layer) {
-            n1 = this.nodes.get(keys[Math.floor(Math.random() * keys.length)]);
-            n2 = this.nodes.get(keys[Math.floor(Math.random() * keys.length)]);
-        }
-
-        if (n1.layer > n2.layer) {
-            const temp = n1;
-            n1 = n2;
-            n2 = temp;
-        }
-
-        for (const c of this.connections.values()) {
-            if (
-                c.inNode == n1.getNodeNumber() &&
-                c.outNode == n2.getNodeNumber()
-            ) {
-                return;
-            }
-        }
-
-        const connectionInnovationNumber = this.getInnovationNumber(
-            innovationHistory,
-            n1.getNodeNumber(),
-            n2.getNodeNumber()
-        );
-        const newCon = new Connection(
-            n1.getNodeNumber(),
-            n2.getNodeNumber(),
-            connectionInnovationNumber,
-            Math.random() * 2 - 1,
-            true
-        );
-
-        this.addConnection(newCon);
-    }
-
-    mutateWeights() {
-        for (const c of this.connections.values()) {
-            c.mutateWeight();
         }
     }
 
-    mutate(innovationHistory) {
-        if (this.connections.size == 0) {
-            this.mutateConnection(innovationHistory);
+    addNode(node, connection, InnovationHistory) {
+        node.id = InnovationHistory.getNodeId(connection);
+        if (this.nodes.has(node.id)) {
+            return false;
         }
-
-        const rand1 = Math.random();
-
-        if (rand1 < 0.8) {
-            this.mutateWeights();
-        }
-        const rand2 = Math.random();
-        if (rand2 < 0.05) {
-            this.mutateConnection(innovationHistory);
-        }
-
-        const rand3 = Math.random();
-        if (rand3 < 0.03) {
-            this.mutateNode(innovationHistory);
-        }
+        this.nodes.set(node.id, node);
+        return true;
     }
 
-    crossover(parent2) {
-        //Assume parent1 is more fit than parent2
-        const child = new Genome();
-
-        for (const n of this.nodes.values()) {
-            child.addNode(n.copy());
-        }
-
-        for (const con1 of this.connections.values()) {
-            let con = null;
-            let setEnabled = true;
-            //if both parents have matching genes, then inheritence is random
-            const con2 = this.matchingGene(parent2, con1);
-            if (con2) {
-                if (con1.isDisabled() || con2.isDisabled()) {
-                    //if either of the matching genes are disabled
-                    if (Math.random() < 0.75) {
-                        //75% of the time disable the childs gene
-                        setEnabled = false;
-                    }
-                }
-                const rand = Math.random();
-                if (rand < 0.5) {
-                    con = con1.copy();
-                } else {
-                    con = con2.copy();
-                }
-            } else {
-                con = con1.copy();
-            }
-            con.enabled = setEnabled;
-            child.addConnection(con);
-        }
-        child.numInputs = this.numInputs;
-        child.numOutputs = this.numOutputs;
-        child.numberOfNodes = this.numberOfNodes;
-        child.layers = this.layers;
-        return child;
+    addConnection(connection, InnovationHistory) {
+        connection.innovation = InnovationHistory.getInnovation(connection);
+        this.connections.set(connection.innovation, connection);
     }
 
-    matchingGene(parent2, c2) {
-        for (const c1 of parent2.connections.values()) {
-            if (c1.getInnovationNo() == c2.getInnovationNo()) {
-                return c1;
+    connectionExists(from, to) {
+        return [...this.connections.values()].some(
+            connection => connection.from.id === from.id && connection.to.id === to.id
+        );
+    }
+
+    isRecurrent(from, to) {
+        const queue = [...to.out];
+
+        while (queue.length) {
+            const connection = queue.shift();
+
+            if (connection.to.id === from.id) return true;
+
+            queue.push(...connection.to.out);
+        }
+
+        return false;
+    }
+
+    mutateAddNode(InnovationHistory) {
+        const connections = [...this.connections.values()].filter(c => c.enabled);
+        const connection = selectRandom(connections);
+
+        if (connection) {
+            const node = new Node(HIDDEN);
+
+            const valid = this.addNode(node, connection, InnovationHistory);
+            if (valid) {
+                connection.disable();
+
+                this.addConnection(new Connection(connection.from, node, 1.0), InnovationHistory);
+                this.addConnection(
+                    new Connection(node, connection.to, connection.weight),
+                    InnovationHistory
+                );
+                return true;
             }
         }
         return false;
     }
 
-    static getExcessDisjoint(parent1, parent2) {
-        let matching = 0;
-        for (const c1 of parent1.connections.values()) {
-            for (const c2 of parent2.connections.values()) {
-                if (c1.getInnovationNo() == c2.getInnovationNo()) {
-                    matching++;
-                    break;
-                }
+    mutateAddConnection(InnovationHistory, Config, tries = 20) {
+        const nodes = Array.from(this.nodes.values());
+
+        while (tries--) {
+            const from = selectRandom(nodes.filter(node => node.type !== OUTPUT));
+
+            const to = selectRandom(
+                nodes.filter(node => node.type !== INPUT && node.type !== BIAS && node !== from)
+            );
+
+            const valid =
+                from && to && !this.connectionExists(from, to) && !this.isRecurrent(from, to);
+
+            if (valid) {
+                const connection = new Connection(
+                    from,
+                    to,
+                    random(-Config.mutation.power, Config.mutation.power)
+                );
+                this.addConnection(connection, InnovationHistory);
+                return true;
             }
         }
-        return (
-            parent1.connections.size + parent2.connections.size - 2 * matching
-        );
+
+        return false;
     }
 
-    static averageWeightDiff(parent1, parent2) {
-        if (parent1.connections.size == 0 || parent2.connections.size == 0) {
-            return 0;
+    mutateWeights(Config) {
+        this.connections.forEach(connection => {
+            if (connection.enabled) {
+                connection.mutate(Config);
+            }
+        });
+    }
+
+    mutateReEnable() {
+        this.connections.forEach(con => {
+            if (!con.enabled) {
+                con.enable();
+                return true;
+            }
+        });
+        return false;
+    }
+
+    mutateToggleEnable(times = 1) {
+        while (times--) {
+            const connection = selectRandom([...this.connections.values()]);
+            if (connection.enabled) {
+                connection.disable();
+                if (!connection.to.in.some(c => c.enabled)) {
+                    connection.enable();
+                }
+            } else {
+                connection.enable();
+            }
+        }
+        return true;
+    }
+
+    mutate(InnovationHistory, Config) {
+        let sort = false;
+
+        if (Math.random() < (Config.mutation.node || 0)) {
+            sort = sort || this.mutateAddNode(InnovationHistory);
+        } else if (Math.random() < (Config.mutation.connection || 0)) {
+            sort = sort || this.mutateAddConnection(InnovationHistory, Config);
+        } else {
+            if (Math.random() < (Config.mutation.weight || 0)) {
+                this.mutateWeights(Config);
+            }
+            if (Math.random() < (Config.mutation.toggle || 0)) {
+                this.mutateToggleEnable();
+            }
+            if (Math.random() < (Config.mutation.reEnable || 0)) {
+                this.mutateReEnable();
+            }
+        }
+        if (sort) {
+            this.sortNetwork();
+        }
+    }
+
+    graph(width, height, pad = { x: 0, y: 0 }) {
+        const network = [];
+        network[0] = this.inputs.map((n, y) => {
+            n.layer = 0;
+            n.vector = {
+                x: width * pad.x,
+                y:
+                    this.inputs.length > 1
+                        ? pad.y * height +
+                          (((1 - 2 * pad.y) * height) / (this.inputs.length + 1)) * (y + 1)
+                        : 0.5 * height,
+            };
+            return n;
+        });
+
+        for (const node of this.hidden) {
+            const layer = node.in.reduce((l, c) => Math.max(l, c.from.layer), 0) + 1;
+            node.layer = layer;
+            if (network[layer] === undefined) {
+                network[layer] = [];
+            }
+            network[layer].push(node);
         }
 
-        let matching = 0;
-        let totalDiff = 0;
-        for (const c1 of parent1.connections.values()) {
-            for (const c2 of parent2.connections.values()) {
-                if (c1.getInnovationNo() == c2.getInnovationNo()) {
-                    matching++;
-                    totalDiff += Math.abs(c1.weight - c2.weight);
-                    break;
+        const hidden = network.length - 1;
+        for (let x = 1; x < network.length; x++) {
+            const layer = network[x];
+            for (let y = 0; y < layer.length; y++) {
+                const node = layer[y];
+                node.vector = {
+                    x: width * pad.x + ((width * (1 - 2 * pad.x)) / (hidden + 1)) * x,
+                    y:
+                        layer.length > 1
+                            ? pad.y * height +
+                              (((1 - 2 * pad.y) * height) / (layer.length + 1)) * (y + 1)
+                            : height * 0.5,
+                };
+            }
+        }
+
+        network.push(
+            this.outputs.map((n, y) => {
+                n.layer = network.length;
+                n.vector = {
+                    x: width * (1 - pad.x),
+                    y:
+                        this.outputs.length > 1
+                            ? pad.y * height +
+                              (((1 - 2 * pad.y) * height) / (this.outputs.length + 1)) * (y + 1)
+                            : height * 0.5,
+                };
+                return n;
+            })
+        );
+
+        return network;
+    }
+
+    static crossover(genome1, genome2) {
+        //assuming genome1 is more fit than genome2
+        if (genome1.originalFitness < genome2.originalFitness) {
+            const temp = genome1;
+            genome1 = genome2;
+            genome2 = temp;
+        }
+
+        const equal = genome1.originalFitness === genome2.originalFitness;
+
+        const child = new Genome();
+
+        // Ensure that all sensors and ouputs are added to the organism
+        genome1.nodes.forEach((node, key) => {
+            if (node.type === BIAS || node.type === INPUT || node.type === OUTPUT) {
+                child.nodes.set(key, node.copy());
+            }
+        });
+
+        const innovationNumbers = [
+            ...new Set([...genome1.connections.keys(), ...genome2.connections.keys()]),
+        ].sort((a, b) => a - b);
+
+        for (const innovation of innovationNumbers) {
+            const con1 = genome1.connections.get(innovation);
+            const con2 = genome2.connections.get(innovation);
+
+            const matching = con1 && con2;
+            const con = matching
+                ? Math.random() > 0.5
+                    ? con1
+                    : con2
+                : equal
+                ? con1 || con2
+                : con1;
+
+            if (!con) {
+                continue;
+            }
+
+            let from = child.nodes.get(con.from.id);
+            if (!from) {
+                from = con.from.copy();
+                child.nodes.set(from.id, from);
+            }
+            let to = child.nodes.get(con.to.id);
+            if (!to) {
+                to = con.to.copy();
+                child.nodes.set(to.id, to);
+            }
+
+            if (child.isRecurrent(from, to)) {
+                continue;
+            }
+            const trait = con.copy(from, to);
+            trait.enable();
+            if (matching && (!con1.enabled || !con2.enabled)) {
+                if (Math.random() < 0.75) {
+                    trait.disable();
+                }
+            }
+            child.connections.set(innovation, trait);
+        }
+
+        child.initializeNetwork();
+
+        return child;
+    }
+
+    static compatibility(genome1, genome2, Config, verbose = false) {
+        const connections1 = [...genome1.connections.keys()];
+        const connections2 = [...genome2.connections.keys()];
+        const innovationNumbers = new Set([...connections1, ...connections2]);
+
+        let excess = 0;
+        let disjoint = 0;
+        const matching = [];
+        const smaller = Math.min(Math.max(...connections1), Math.max(...connections2));
+
+        const N = Math.max(connections1.length, connections2.length, 1);
+        for (const innovation of innovationNumbers) {
+            const con1 = genome1.connections.get(innovation);
+            const con2 = genome2.connections.get(innovation);
+
+            if (con1 && con2) {
+                matching.push(Math.abs(con1.weight - con2.weight));
+            } else if (!con1 || !con2) {
+                if (innovation > smaller) {
+                    excess++;
+                } else {
+                    disjoint++;
                 }
             }
         }
-        if (matching == 0) {
-            //divide by 0 error
-            return 100;
+
+        const weightDiff = matching.reduce((a, b) => a + b, 0) / matching.length || 0;
+
+        const distance =
+            (excess * Config.excessCoefficient) / N +
+            (disjoint * Config.disjointCoefficient) / N +
+            weightDiff * Config.weightDifferenceCoefficient;
+
+        if (verbose) {
+            return {
+                excess,
+                disjoint,
+                distance,
+                weightDiff,
+                matching: matching.length,
+            };
         }
-        return totalDiff / matching;
+
+        return distance;
     }
 }
