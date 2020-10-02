@@ -163,8 +163,8 @@ export default class Genome {
                     new Connection(node, connection.to, connection.weight),
                     InnovationHistory
                 );
+                return true;
             }
-            return true;
         }
         return false;
     }
