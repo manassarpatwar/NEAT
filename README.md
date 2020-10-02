@@ -30,4 +30,9 @@ npm run test
 - [Code bullet NEAT implementation](https://github.com/Code-Bullet/NEAT-Template-JavaScript)
 - [NEAT implementation in JS by Alenaksu](https://github.com/alenaksu/neatjs)
 
+## NEAT Original Paper
 [Kenneth O. Stanley's original NEAT paper](http://nn.cs.utexas.edu/downloads/papers/stanley.ec02.pdf)
+
+## LICENSE
+[MIT](https://opensource.org/licenses/MIT)
+Copyright (c) 2020-present Manas Sarpatwar
